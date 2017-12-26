@@ -65,8 +65,9 @@ local proto_fields = {
 -- for more, see ProtoField: 
 -- https://www.wireshark.org/docs/wsdg_html_chunked/lua_module_Proto.html 
 -- abbr: Abbreviated name of the field (the string used in filters).
-    length = ProtoField.uint24("sharp.length", "Section Length", base.DEC), 
-    type   = ProtoField.string("sharp.type", "Type", base.ASCII)
+    length    = ProtoField.uint32("sharp.length", "Section Length", base.DEC), 
+    type      = ProtoField.string("sharp.type", "Type", base.ASCII), 
+	timestamp = ProtoField.uint32("sharp.timestamp", "Timestamp", base.DEC) 
 }
 sharp_proto.fields = proto_fields  
 
@@ -81,7 +82,10 @@ function readData(buffer, pinfo, tree)
     else 
         subtree:add(proto_fields.type, buffer, "unknown")
     end 
-    getField(buffer,subtree,"T","Timestamp","[^\"]*")
+    local t,tbuffer,stree = getField(buffer,subtree,"T","Timestamp","[^\"]*", proto_fields.timestamp)
+	if t then 
+	    stree:add(tbuffer,"Time: "..os.date("%Y-%m-%d %H:%M:%S", t))
+	end 
 end 
 
 -- Private Internets, RFC1918
@@ -101,27 +105,39 @@ function isPrivate(address)
     return false 
 end 
 
-function getField(buffer,tree,key,key_name,value_pattern)
+function getField(buffer,tree,key,key_name,value_pattern,proto_field)
     local str = buffer:string()
     local pattern = "("..key.."=\"("..value_pattern..")\")"
     local whole, value = str:match(pattern)
+	local target_buffer, subtree
     if whole then 
-        local ii,jj = str:find(pattern)
-        tree:add(buffer(ii-1,jj-ii+1),key_name..": "..value)
+        local ii,jj         = str:find(pattern)
+		target_buffer = buffer(ii-1,jj-ii+1)
+		if proto_field then 
+		    subtree = tree:add(proto_field,target_buffer,value,key_name..": "..value)
+		else 
+            subtree = tree:add(target_buffer,key_name..": "..value)
+		end 
     end
-    return value
+    return value, target_buffer, subtree
 end
 
-function getField2(buffer,tree,key,key_name,value_pattern)
+function getField2(buffer,tree,key,key_name,value_pattern,proto_field)
     local str = buffer:string()
     local pattern = "[^%a]("..key.."=\"("..value_pattern..")\")"
     local whole, value = str:match(pattern)
+	local target_buffer, subtree
     if whole then 
         local ii,jj = str:find(pattern)
         ii = ii + 1
-        tree:add(buffer(ii-1,jj-ii+1),key_name..": "..value)
+		target_buffer = buffer(ii-1,jj-ii+1)
+		if proto_field then 
+		    subtree = tree:add(proto_field,target_buffer,value,key_name..": "..value)
+		else 
+            subtree = tree:add(target_buffer,key_name..": "..value)
+		end 
     end
-    return value
+    return value, target_buffer, subtree
 end
 
 -- load the tcp.port table
