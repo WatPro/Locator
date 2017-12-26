@@ -1,15 +1,26 @@
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 --
 -- SHARP
 --
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 --[[
-
-]]----------------------------------------
+    This dissector is developed to facilitate the analysis of the network 
+    communications between MediaTek MT2503/MTK3333 empowered devices and backend 
+    servers. The custom protocol built on TCP packets was provided and 
+    implemented by the third party, and it was not well designed. 
+    Every piece of data sent from a device is ended with character sharp #. 
+    However, at the time being, network packets from servers do not follow this   
+    rule, and each one represents a piece of complete information. (we recommand 
+    that both sides should do the same, so that long data could be sent from a 
+    server using several packets.)
+    Note: Some parts of the script file have been removed, as disclosure of the 
+    information may violate the confident agreement with the bussiness client. 
+    Note: This script should be placed in Wireshark\App\Wireshark\plugins
+]]------------------------------------------------------------
 
 local default_settings = 
 {
-    port       = 7076, 
+    port       = 8000, 
     delimiter  = "#" 
 }
 
@@ -51,6 +62,9 @@ function sharp_proto.dissector(buffer, pinfo, tree)
 end
 
 local proto_fields = {
+-- for more, see ProtoField: 
+-- https://www.wireshark.org/docs/wsdg_html_chunked/lua_module_Proto.html 
+-- abbr: Abbreviated name of the field (the string used in filters).
     type = ProtoField.string("sharp.type", "Type", base.ASCII)
 }
 sharp_proto.fields = proto_fields  
@@ -69,11 +83,20 @@ function readData(buffer, pinfo, tree)
     getField(buffer,subtree,"T","Timestamp","[^\"]*")
 end 
 
+-- Private Internets, RFC1918
 function isPrivate(address)
--- Private Internets, 24-bit block, RFC1918 
+-- 24-bit block  
     if (Address.ip("10.0.0.0")<=address) and (address<=Address.ip("10.255.255.255")) then 
         return true 
     end 
+-- 20-bit block  
+    if (Address.ip("172.16.0.0")<=address) and (address<=Address.ip("172.31.255.255")) then 
+        return true 
+    end
+-- 16-bit block 
+    if (Address.ip("192.168.0.0")<=address) and (address<=Address.ip("192.168.255.255")) then 
+        return true 
+    end
     return false 
 end 
 
@@ -96,3 +119,4 @@ end
 tpc_table = DissectorTable.get("tcp.port")
 -- register the protocol with port number 
 tpc_table:add(default_settings.port,sharp_proto)
+ 
