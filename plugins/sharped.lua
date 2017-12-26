@@ -32,7 +32,11 @@ function sharp_proto.dissector(buffer, pinfo, tree)
     if isPrivate(pinfo.net_src) and isPrivate(pinfo.net_dst) then 
         return 0 
     end 
-    pinfo.cols.protocol = "SHARP" 
+    if buffer:reported_len() == buffer:len() then 
+        pinfo.cols.protocol = "SHARP" 
+    else 
+        pinfo.cols.protocol = "SHARP(broken)" 
+    end 
     local subtree = tree:add(sharp_proto,buffer(),"SHARP")
     -- get the length of the packet buffer 
     local packet_len     = buffer:len() 
@@ -66,8 +70,8 @@ local proto_fields = {
 -- https://www.wireshark.org/docs/wsdg_html_chunked/lua_module_Proto.html 
 -- abbr: Abbreviated name of the field (the string used in filters).
     length    = ProtoField.uint32("sharp.length", "Section Length", base.DEC), 
-    type      = ProtoField.string("sharp.type", "Type", base.ASCII), 
-	timestamp = ProtoField.uint32("sharp.timestamp", "Timestamp", base.DEC) 
+    type      = ProtoField.string("sharp.type", "Type", base.ASCII),       
+    timestamp = ProtoField.uint32("sharp.timestamp", "Timestamp", base.DEC) 
 }
 sharp_proto.fields = proto_fields  
 
@@ -82,9 +86,9 @@ function readData(buffer, pinfo, tree)
     else 
         subtree:add(proto_fields.type, buffer, "unknown")
     end 
-    local t,tbuffer,stree = getField(buffer,subtree,"T","Timestamp","[^\"]*", proto_fields.timestamp)
+    local t,tbuffer = getField(buffer,"T","[^\"]*")
 	if t then 
-	    stree:add(tbuffer,"Time: "..os.date("%Y-%m-%d %H:%M:%S", t))
+	    subtree:add(proto_fields.timestamp,tbuffer,t,nil,os.date("(%Y-%m-%d %X)", t))
 	end 
 end 
 
@@ -105,39 +109,29 @@ function isPrivate(address)
     return false 
 end 
 
-function getField(buffer,tree,key,key_name,value_pattern,proto_field)
+function getField(buffer,key,value_pattern)
     local str = buffer:string()
     local pattern = "("..key.."=\"("..value_pattern..")\")"
     local whole, value = str:match(pattern)
-	local target_buffer, subtree
+	local target_buffer
     if whole then 
-        local ii,jj         = str:find(pattern)
-		target_buffer = buffer(ii-1,jj-ii+1)
-		if proto_field then 
-		    subtree = tree:add(proto_field,target_buffer,value,key_name..": "..value)
-		else 
-            subtree = tree:add(target_buffer,key_name..": "..value)
-		end 
+        local ii,jj   = str:find(pattern)
+		target_buffer = buffer(ii-1,jj-ii+1) 
     end
-    return value, target_buffer, subtree
+    return value, target_buffer
 end
 
-function getField2(buffer,tree,key,key_name,value_pattern,proto_field)
+function getField2(buffer,key,value_pattern)
     local str = buffer:string()
     local pattern = "[^%a]("..key.."=\"("..value_pattern..")\")"
     local whole, value = str:match(pattern)
-	local target_buffer, subtree
+	local target_buffer 
     if whole then 
         local ii,jj = str:find(pattern)
         ii = ii + 1
 		target_buffer = buffer(ii-1,jj-ii+1)
-		if proto_field then 
-		    subtree = tree:add(proto_field,target_buffer,value,key_name..": "..value)
-		else 
-            subtree = tree:add(target_buffer,key_name..": "..value)
-		end 
     end
-    return value, target_buffer, subtree
+    return value, target_buffer
 end
 
 -- load the tcp.port table
