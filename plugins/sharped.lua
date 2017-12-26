@@ -87,9 +87,9 @@ function readData(buffer, pinfo, tree)
         subtree:add(proto_fields.type, buffer, "unknown")
     end 
     local t,tbuffer = getField(buffer,"T","[^\"]*")
-	if t then 
-	    subtree:add(proto_fields.timestamp,tbuffer,t,nil,os.date("(%Y-%m-%d %X)", t))
-	end 
+    if t then 
+        subtree:add(proto_fields.timestamp,tbuffer,t,nil,os.date("(%Y-%m-%d %X)", t))
+    end 
 end 
 
 -- Private Internets, RFC1918
@@ -113,10 +113,10 @@ function getField(buffer,key,value_pattern)
     local str = buffer:string()
     local pattern = "("..key.."=\"("..value_pattern..")\")"
     local whole, value = str:match(pattern)
-	local target_buffer
+    local target_buffer
     if whole then 
         local ii,jj   = str:find(pattern)
-		target_buffer = buffer(ii-1,jj-ii+1) 
+        target_buffer = buffer(ii-1,jj-ii+1) 
     end
     return value, target_buffer
 end
@@ -125,11 +125,11 @@ function getField2(buffer,key,value_pattern)
     local str = buffer:string()
     local pattern = "[^%a]("..key.."=\"("..value_pattern..")\")"
     local whole, value = str:match(pattern)
-	local target_buffer 
+    local target_buffer 
     if whole then 
         local ii,jj = str:find(pattern)
         ii = ii + 1
-		target_buffer = buffer(ii-1,jj-ii+1)
+        target_buffer = buffer(ii-1,jj-ii+1)
     end
     return value, target_buffer
 end
