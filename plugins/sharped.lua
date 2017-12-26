@@ -32,14 +32,15 @@ function sharp_proto.dissector(buffer, pinfo, tree)
     if isPrivate(pinfo.net_src) and isPrivate(pinfo.net_dst) then 
         return 0 
     end 
-    if buffer:reported_len() == buffer:len() then 
-        pinfo.cols.protocol = "SHARP" 
-    else 
-        pinfo.cols.protocol = "SHARP(broken)" 
-    end 
-    local subtree = tree:add(sharp_proto,buffer(),"SHARP")
+    pinfo.cols.protocol = "SHARP" 
     -- get the length of the packet buffer 
-    local packet_len     = buffer:len() 
+    local packet_len  = buffer:len() 
+    local subtree
+    if packet_len == buffer:reported_len() then 
+        subtree = tree:add(sharp_proto,buffer(),"SHARP")
+    else 
+        subtree = tree:add(sharp_proto,buffer(),"SHARP(broken)") 
+    end 
     local tcp_load       = buffer():string()
     local bytes_consumed = 0; 
     -- server send 
@@ -68,7 +69,6 @@ end
 local proto_fields = {
 -- for more, see ProtoField: 
 -- https://www.wireshark.org/docs/wsdg_html_chunked/lua_module_Proto.html 
--- abbr: Abbreviated name of the field (the string used in filters).
     length    = ProtoField.uint32("sharp.length", "Section Length", base.DEC), 
     type      = ProtoField.string("sharp.type", "Type", base.ASCII),       
     timestamp = ProtoField.uint32("sharp.timestamp", "Timestamp", base.DEC) 
