@@ -65,20 +65,21 @@ local proto_fields = {
 -- for more, see ProtoField: 
 -- https://www.wireshark.org/docs/wsdg_html_chunked/lua_module_Proto.html 
 -- abbr: Abbreviated name of the field (the string used in filters).
-    type = ProtoField.string("sharp.type", "Type", base.ASCII)
+    length = ProtoField.uint24("sharp.length", "Section Length", base.DEC), 
+    type   = ProtoField.string("sharp.type", "Type", base.ASCII)
 }
 sharp_proto.fields = proto_fields  
 
 function readData(buffer, pinfo, tree) 
     local packet_len = buffer:len()
-    local subtree    = tree:add(buffer,"Section Size: " .. packet_len)
+    local subtree    = tree:add(proto_fields.length, buffer, packet_len, nil, "bytes")
     local str        = buffer:string() 
     if str:sub(1,1) == "{" or str:sub(1,1) == "[" then 
-        subtree:add(proto_fields.type, "json", "Type:", "JavaScript Object Notation (JSON) ")
+        subtree:add(proto_fields.type, buffer, "json", nil, "(JSON)", "JavaScript Object Notation ")
     elseif str:sub(1,1) == "<" then 
-        subtree:add(proto_fields.type, "xml", "Type:", "Extensible Markup Language (XML) ")
+        subtree:add(proto_fields.type, buffer, "xml", nil, "(XML)", "Extensible Markup Language ")
     else 
-        subtree:add(proto_fields.type, "unknown", "Type:", "Unknown ")
+        subtree:add(proto_fields.type, buffer, "unknown")
     end 
     getField(buffer,subtree,"T","Timestamp","[^\"]*")
 end 
@@ -106,14 +107,22 @@ function getField(buffer,tree,key,key_name,value_pattern)
     local whole, value = str:match(pattern)
     if whole then 
         local ii,jj = str:find(pattern)
--- alternatively, pattern = "[^%a]("..key.."=\"("..value_pattern..")\")" 
--- then ii = ii + 1
         tree:add(buffer(ii-1,jj-ii+1),key_name..": "..value)
     end
     return value
 end
 
-
+function getField2(buffer,tree,key,key_name,value_pattern)
+    local str = buffer:string()
+    local pattern = "[^%a]("..key.."=\"("..value_pattern..")\")"
+    local whole, value = str:match(pattern)
+    if whole then 
+        local ii,jj = str:find(pattern)
+        ii = ii + 1
+        tree:add(buffer(ii-1,jj-ii+1),key_name..": "..value)
+    end
+    return value
+end
 
 -- load the tcp.port table
 tpc_table = DissectorTable.get("tcp.port")
