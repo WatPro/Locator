@@ -86,9 +86,9 @@ function readData(buffer, pinfo, tree)
     else 
         subtree:add(proto_fields.type, buffer, "unknown")
     end 
-    local t,tbuffer = getField(buffer,"T","[^\"]*")
-    if t then 
-        subtree:add(proto_fields.timestamp,tbuffer,t,nil,os.date("(%Y-%m-%d %X)", t))
+    local v,vbuffer = getField(buffer,"T","[^\"]*")
+    if v then 
+        subtree:add(proto_fields.timestamp,vbuffer,v,nil,os.date("(%Y-%m-%d %X)", v))
     end 
 end 
 
