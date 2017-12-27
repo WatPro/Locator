@@ -3,19 +3,19 @@
 -- SHARP
 --
 --------------------------------------------------------------------------------
---[[
-    This dissector is developed to facilitate the analysis of the network 
+--[[                                                                            
+    This dissector is developed to facilitate the analysis of the network       
     communications between MediaTek MT2503/MTK3333 empowered devices and backend 
-    servers. The custom protocol built on TCP packets was provided and 
-    implemented by the third party, and it was not well designed. 
-    Every piece of data sent from a device is ended with character sharp #. 
-    However, at the time being, network packets from servers do not follow this   
-    rule, and each one represents a piece of complete information. (we recommand 
-    that both sides should do the same, so that long data could be sent from a 
-    server using several packets.)
+    servers. The custom protocol built on TCP packets was provided and          
+    implemented by the third party, and it was not well designed.               
+    Every piece of data sent from a device is ended with character sharp #.     
+    However, at the time being, network packets from servers do not follow this 
+    rule, and each one represents a piece of complete information. (The team    
+    recommands that both sides should do the same, so that long data could be   
+    sent from a server using several packets.)                                  
     Note: Some parts of the script file have been removed, as disclosure of the 
-    information may violate the confident agreement with the bussiness client. 
-    Note: This script should be placed in Wireshark\App\Wireshark\plugins
+    information may violate the confident agreement with the bussiness client.  
+    Note: This script should be placed in Wireshark\App\Wireshark\plugins       
 ]]------------------------------------------------------------
 
 local default_settings = 
@@ -27,10 +27,23 @@ local default_settings =
 -- creates a Proto object
 local sharp_proto = Proto("SHARP", "Sharp-Separated Segment")
 
+local proto_fields = {
+-- for more, see ProtoField: 
+-- https://www.wireshark.org/docs/wsdg_html_chunked/lua_module_Proto.html 
+    internal  = ProtoField.bool("sharp.internal", "Internal Communication Flag", base.NONE, {
+        [1] = "Internal", 
+        [2] = "External"
+    }),
+    length    = ProtoField.uint32("sharp.length", "Section Length", base.DEC), 
+    type      = ProtoField.string("sharp.type", "Type", base.ASCII),       
+    timestamp = ProtoField.uint32("sharp.timestamp", "Timestamp", base.DEC) 
+}
+sharp_proto.fields = proto_fields  
+
 function sharp_proto.dissector(buffer, pinfo, tree) 
     -- ignore communucations behind API gateway  
     if isPrivate(pinfo.net_src) and isPrivate(pinfo.net_dst) then 
-        return 0 
+        return 0  
     end 
     pinfo.cols.protocol = "SHARP" 
     -- get the length of the packet buffer 
@@ -41,10 +54,18 @@ function sharp_proto.dissector(buffer, pinfo, tree)
     else 
         subtree = tree:add(sharp_proto,buffer(),"SHARP(broken)") 
     end 
+    -- label communucations behind API gateway  
+    if isPrivate(pinfo.net_src) and isPrivate(pinfo.net_dst) then 
+        subtree:add(proto_fields.internal, true)
+    else 
+        subtree:add(proto_fields.internal, false)   
+    end 
     local tcp_load       = buffer():string()
     local bytes_consumed = 0; 
     -- server send 
-    if isPrivate(pinfo.net_src) then
+    if pinfo.src_port == default_settings.port and 
+            pinfo.dst_port ~= default_settings.port and 
+            isPrivate(pinfo.net_src) then
         readData(buffer(), pinfo, subtree)
         return packet_len 
     end 
@@ -65,15 +86,6 @@ function sharp_proto.dissector(buffer, pinfo, tree)
     end 
     return packet_len 
 end
-
-local proto_fields = {
--- for more, see ProtoField: 
--- https://www.wireshark.org/docs/wsdg_html_chunked/lua_module_Proto.html 
-    length    = ProtoField.uint32("sharp.length", "Section Length", base.DEC), 
-    type      = ProtoField.string("sharp.type", "Type", base.ASCII),       
-    timestamp = ProtoField.uint32("sharp.timestamp", "Timestamp", base.DEC) 
-}
-sharp_proto.fields = proto_fields  
 
 function readData(buffer, pinfo, tree) 
     local packet_len = buffer:len()
