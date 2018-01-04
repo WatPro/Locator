@@ -15,7 +15,7 @@
     sent from a server using several packets.)                                  
     Note: Some parts of the script file have been removed, as disclosure of the 
     information may violate the confident agreement with the bussiness client.  
-    Note: This script should be placed in Wireshark\App\Wireshark\plugins       
+    Note: This script should be placed in Wireshark\plugins       
 ]]------------------------------------------------------------
 
 local default_settings = 
@@ -35,8 +35,9 @@ local proto_fields = {
         [2] = "External"
     }),
     length    = ProtoField.uint32("sharp.length", "Section Length", base.DEC), 
-    type      = ProtoField.string("sharp.type", "Type", base.ASCII),       
-    timestamp = ProtoField.uint32("sharp.timestamp", "Timestamp", base.DEC) 
+    type        = ProtoField.string("sharp.type", "Type", base.ASCII),  
+-- specified fields     
+    timestamp   = ProtoField.uint32("sharp.timestamp", "Timestamp", base.DEC) 
 }
 sharp_proto.fields = proto_fields  
 
@@ -93,16 +94,27 @@ function readData(buffer, pinfo, tree)
     local str        = buffer:string() 
     if str:sub(1,1) == "{" or str:sub(1,1) == "[" then 
         subtree:add(proto_fields.type, buffer, "json", nil, "(JSON)", "JavaScript Object Notation ")
+        readJSON(buffer, pinfo, subtree)
     elseif str:sub(1,1) == "<" then 
         subtree:add(proto_fields.type, buffer, "xml", nil, "(XML)", "Extensible Markup Language ")
+        readXML(buffer, pinfo, subtree)
     else 
         subtree:add(proto_fields.type, buffer, "unknown")
     end 
-    local v,vbuffer = getField(buffer,"T","[^\"]*")
-    if v then 
-        subtree:add(proto_fields.timestamp,vbuffer,v,nil,os.date("(%Y-%m-%d %X)", v))
-    end 
 end 
+
+function readJSON(buffer, pinfo, tree) 
+    local v,vbuffer = getField(buffer,"T","[^\"]*",":")
+    if v then 
+        tree:add(proto_fields.timestamp,vbuffer,v,nil,os.date("(%Y-%m-%d %X)", v))
+    end
+end 
+function readXML(buffer, pinfo, tree) 
+    local v,vbuffer = getField(buffer,"T","[^\"]*","=")
+    if v then 
+        tree:add(proto_fields.timestamp,vbuffer,v,nil,os.date("(%Y-%m-%d %X)", v))
+    end 
+end
 
 -- Private Internets, RFC1918
 function isPrivate(address)
@@ -121,9 +133,9 @@ function isPrivate(address)
     return false 
 end 
 
-function getField(buffer,key,value_pattern)
+function getField(buffer,key,value_pattern,joiner)
     local str = buffer:string()
-    local pattern = "("..key.."=\"("..value_pattern..")\")"
+    local pattern = "("..key..joiner.."\"("..value_pattern..")\")"
     local whole, value = str:match(pattern)
     local target_buffer
     if whole then 
@@ -133,9 +145,9 @@ function getField(buffer,key,value_pattern)
     return value, target_buffer
 end
 
-function getField2(buffer,key,value_pattern)
+function getField2(buffer,key,value_pattern,joiner)
     local str = buffer:string()
-    local pattern = "[^%a]("..key.."=\"("..value_pattern..")\")"
+    local pattern = "[^%a]("..key..joiner.."\"("..value_pattern..")\")"
     local whole, value = str:match(pattern)
     local target_buffer 
     if whole then 
