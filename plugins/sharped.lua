@@ -104,7 +104,7 @@ function readData(buffer, pinfo, tree)
 end 
 
 function readJSON(buffer, pinfo, tree) 
-    local v,vbuffer = getField(buffer,"T","[^\"]*",":")
+    local v,vbuffer = getField(buffer,"\"T\"","[^\"]*",":")
     if v then 
         tree:add(proto_fields.timestamp,vbuffer,v,nil,os.date("(%Y-%m-%d %X)", v))
     end
